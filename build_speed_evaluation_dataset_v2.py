@@ -405,6 +405,56 @@ if __name__ == "__main__":
         if len(prompts["math-zh"]) >= N_PREFETCH:
             break
 
+
+
+    # Supplement Chinese mathematics with native Chinese word problems
+    # from CMATH, then translated GSM8K questions if more candidates are needed.
+    math_zh_seen = set(prompts["math-zh"])
+
+    def add_math_zh_question(question):
+        question = str(question or "").strip()
+        if not question or not is_chinese_text(question):
+            return
+
+        prompt = (
+            "请详细解答下面的数学问题，给出清晰的推导步骤和最终答案：\n\n"
+            + question
+        )
+
+        if prompt in math_zh_seen or not check_prompt_length(prompt):
+            return
+
+        prompts["math-zh"].append(prompt)
+        math_zh_seen.add(prompt)
+
+    # 1. Native Chinese math word problems.
+    if len(prompts["math-zh"]) < N_PREFETCH:
+        ds_name = "weitianwen/cmath"
+        print(f"Loading {ds_name}...")
+        cmath = datasets.load_dataset(ds_name, split="validation")
+
+        for sample in cmath.shuffle(seed=shuffle_seed):
+            add_math_zh_question(sample.get("question", ""))
+
+            if len(prompts["math-zh"]) >= N_PREFETCH:
+                break
+
+    # 2. Additional Chinese-translated grade-school math problems.
+    if len(prompts["math-zh"]) < N_PREFETCH:
+        ds_name = "meta-math/GSM8K_zh"
+        print(f"Loading {ds_name}...")
+        gsm8k_zh = datasets.load_dataset(ds_name, split="train")
+
+        for sample in gsm8k_zh.shuffle(seed=shuffle_seed):
+            add_math_zh_question(sample.get("question_zh", ""))
+
+            if len(prompts["math-zh"]) >= N_PREFETCH:
+                break
+
+    print(f"math-zh candidate prompts after supplementation: "
+          f"{len(prompts['math-zh'])}")
+
+
     # Chinese coding instructions. The "code" configuration contains prompt/response pairs.
     ds_name = "Mxode/Chinese-Instruct-Lite"
     print(f"Loading {ds_name} code...")
@@ -536,12 +586,6 @@ if __name__ == "__main__":
     final_prompts = collections.defaultdict(list)
     info_table = [["Domain", "No. prompts", "Mean prompt length, toks", "Mean response length, toks"]]
     for domain, raw_prompts in prompts.items():
-
-        # DEBUG BEGIN
-        #if domain != "qa-ru":
-        #    continue
-        # DEBUG END
-
         raw_prompts = list(dict.fromkeys(raw_prompts))  # avoid duplicates; keeps the order, so the selection is reproducible
         print("\nDomain: {}  raw prompts: {}".format(domain, len(raw_prompts)))
 
