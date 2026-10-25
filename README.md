@@ -75,7 +75,7 @@ The construction script collects candidate prompts from public datasets and priv
     --- creative writing.
 -   [`smd20/social-engineering-qa-english`](https://huggingface.co/datasets/smd20/social-engineering-qa-english)
     --- question answering.
--   **RUPOR and LoRuGEC** --- Russian grammar-correction resources.
+-   **RUPOR** [arXiv:2505.04507](https://arxiv.org/abs/2505.04507) and **LoRuGEC** [link](https://aclanthology.org/2025.bea-1.38/) --- Russian grammar-correction resources.
 -   Private prompt collections for Russian poetry.
 
 Some Russian sources are local files and are not included in this repository.
