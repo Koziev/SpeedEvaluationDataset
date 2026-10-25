@@ -27,25 +27,25 @@ The dataset measures generation performance, not task quality. It does not provi
 
 ## Domains
 
-  Domain key      Task
-  --------------- -------------------------------------------------------
-  `qa`            English-language question answering  
-  `qa-ru`         Russian-language question answering and instructions  
-  `qa-zh`         Chinese-language general question answering  
-  `math`          English-language mathematics problems  
-  `math-ru`       Russian-language mathematics problems  
-  `math-zh`       Chinese-language mathematics problems    
-  `code`          English-language coding tasks  
-  `code-ru`       Russian-language coding tasks  
-  `code-zh`       Chinese-language coding tasks  
-  `poetry-en`     English poetry generation  
-  `poetry-ru`     Russian poetry generation  
-  `poetry-zh`     Chinese poetry generation  
-  `gec-en`        English grammar, punctuation, and spelling correction  
-  `gec-ru`        Russian grammar, punctuation, and spelling correction    
-  `wmt ru-en`     Translation from Russian into English    
-  `creative-en`   English creative writing  
-  `creative-ru`   Russian creative writing  
+| Domain key | Task |
+|---|---|
+| `qa` | English-language question answering |
+| `qa-ru` | Russian-language question answering and instructions |
+| `qa-zh` | Chinese-language general question answering |
+| `math` | English-language mathematics problems |
+| `math-ru` | Russian-language mathematics problems |
+| `math-zh` | Chinese-language mathematics problems |
+| `code` | English-language coding tasks |
+| `code-ru` | Russian-language coding tasks |
+| `code-zh` | Chinese-language coding tasks |
+| `poetry-en` | English poetry generation |
+| `poetry-ru` | Russian poetry generation |
+| `poetry-zh` | Chinese poetry generation |
+| `gec-en` | English grammar, punctuation, and spelling correction |
+| `gec-ru` | Russian grammar, punctuation, and spelling correction |
+| `wmt ru-en` | Translation from Russian into English |
+| `creative-en` | English creative writing |
+| `creative-ru` | Russian creative writing |
 
 The domain names identify the task and language. The dataset-building script targets 100 prompts per domain; the actual number available in a
 generated dataset depends on how many candidates pass filtering and response-length selection.
@@ -83,40 +83,13 @@ Some Russian sources are local files and are not included in this repository.
 
 ### Chinese domains
 
-  -------------------------------------------------------------------------------------------------------------------------------------------------------
-  Domain                  Source                                                                                                  Selection approach
-  ----------------------- ------------------------------------------------------------------------------------------------------- -----------------------
-  `qa-zh`                 [`agentlans/allenai-WildChat-4.8M`](https://huggingface.co/datasets/agentlans/allenai-WildChat-4.8M),   Select user prompts
-                          `Chinese` configuration                                                                                 from two-message
-                                                                                                                                  human/assistant
-                                                                                                                                  conversations when both
-                                                                                                                                  the query and response
-                                                                                                                                  exceed 200 characters
-                                                                                                                                  and pass the
-                                                                                                                                  Chinese-text filter.
-
-  `math-zh`               [`Shawn-wxh/livek12bench`](https://huggingface.co/datasets/Shawn-wxh/livek12bench)                      Select Chinese records
-                                                                                                                                  in the `zh_2603` and
-                                                                                                                                  `zh_2605` splits whose
-                                                                                                                                  subject is mathematics.
-                                                                                                                                  Each question is
-                                                                                                                                  wrapped in an
-                                                                                                                                  instruction asking for
-                                                                                                                                  a detailed solution.
-
-  `code-zh`               [`Mxode/Chinese-Instruct-Lite`](https://huggingface.co/datasets/Mxode/Chinese-Instruct-Lite), `code`    Sample Chinese coding
-                          configuration                                                                                           instructions with
-                                                                                                                                  non-empty prompt and
-                                                                                                                                  response fields.
-
-  `poetry-zh`             [`lcccher/Chinese-Instruct`](https://huggingface.co/datasets/lcccher/Chinese-Instruct), `firefly`       Filter Chinese
-                          configuration                                                                                           instructions for
-                                                                                                                                  poetry-related terms,
-                                                                                                                                  including requests for
-                                                                                                                                  poems, classical verse,
-                                                                                                                                  lyrics, and couplets.
-  -------------------------------------------------------------------------------------------------------------------------------------------------------
-
+| Domain | Source                                                                                                                        | Selection approach                                                                                                                                                                         |
+|---|-------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+|`qa-zh`| [`agentlans/allenai-WildChat-4.8M`](https://huggingface.co/datasets/agentlans/allenai-WildChat-4.8M), `Chinese` configuration | Select user prompts<br>from two-message<br>human/assistant<br>conversations when both<br>the query and response<br>exceed 200 characters<br>and pass the<br>Chinese-text filter.           |
+|`math-zh`| [`Shawn-wxh/livek12bench`](https://huggingface.co/datasets/Shawn-wxh/livek12bench) | Select Chinese records<br>in the `zh_2603` and<br>`zh_2605` splits whose<br>subject is mathematics.<br>Each question is<br>wrapped in an<br>instruction asking for<br>a detailed solution. |
+|`code-zh`| [`Mxode/Chinese-Instruct-Lite`](https://huggingface.co/datasets/Mxode/Chinese-Instruct-Lite), `code` configuration | Sample Chinese coding<br>instructions with<br>non-empty prompt and<br>response fields. |
+|`poetry-zh`| [`lcccher/Chinese-Instruct`](https://huggingface.co/datasets/lcccher/Chinese-Instruct), `firefly` configuration | Filter Chinese<br>instructions for<br>poetry-related terms,<br>including requests for<br>poems, classical verse,<br>lyrics, and couplets.|
+                                                                                                                                 
 The Chinese text filter checks whether Han characters account for more than half of the relevant characters after whitespace and punctuation
 are excluded. It is a practical script-level heuristic, not a comprehensive language-identification system.
 
