@@ -35,18 +35,18 @@ not provide reference answers or define a quality-scoring protocol.
 
   Domain key      Task
   --------------- -------------------------------------------------------
-  `poetry-ru`     Russian poetry generation
-  `gec-ru`        Russian grammar, punctuation, and spelling correction
-  `gec-en`        English grammar, punctuation, and spelling correction
-  `math-ru`       Russian-language mathematics problems
-  `qa-ru`         Russian-language question answering and instructions
-  `code-ru`       Russian-language coding tasks
-  `wmt ru-en`     Translation from Russian into English
-  `code`          English-language coding tasks
-  `math`          English-language mathematics problems
-  `poetry-en`     English poetry generation
-  `creative-en`   English creative writing
-  `qa`            English-language question answering
+  `poetry-ru`     Russian poetry generation  
+  `gec-ru`        Russian grammar, punctuation, and spelling correction  
+  `gec-en`        English grammar, punctuation, and spelling correction  
+  `math-ru`       Russian-language mathematics problems  
+  `qa-ru`         Russian-language question answering and instructions  
+  `code-ru`       Russian-language coding tasks  
+  `wmt ru-en`     Translation from Russian into English  
+  `code`          English-language coding tasks  
+  `math`          English-language mathematics problems  
+  `poetry-en`     English poetry generation  
+  `creative-en`   English creative writing  
+  `qa`            English-language question answering  
 
 There are six Russian-oriented and six English-oriented domain
 categories. Each category contains 100 prompts.
