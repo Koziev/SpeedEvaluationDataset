@@ -5,7 +5,7 @@ speculative decoding.
 
 ## Overview
 
-The dataset is designed to contain **100 prompts in each of 17 domains** (up to **1,700 prompts** in total), covering English, Russian, and
+The dataset is designed to contain **100 prompts in each of 16 domains** (up to **1,600 prompts** in total), covering English, Russian, and
 Chinese. Tasks include mathematics, code generation, grammar correction, question answering, poetry, creative writing, and Russian-to-English
 translation.
 
@@ -45,7 +45,6 @@ The dataset measures generation performance, not task quality. It does not provi
 | `gec-ru` | Russian grammar, punctuation, and spelling correction |
 | `wmt ru-en` | Translation from Russian into English |
 | `creative-en` | English creative writing |
-| `creative-ru` | Russian creative writing |
 
 The domain names identify the task and language. The dataset-building script targets 100 prompts per domain; the actual number available in a
 generated dataset depends on how many candidates pass filtering and response-length selection.
