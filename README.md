@@ -22,7 +22,7 @@ The dataset measures generation performance, not task quality. It does not provi
 -   [`speed_evaluation_dataset.md`](speed_evaluation_dataset.md) ---
     prompt and response length statistics for each domain, measured with
     the `Qwen/Qwen3-0.6B` tokenizer.
--   [`build_speed_evaluation_dataset.py`](build_speed_evaluation_dataset.py)
+-   [`build_speed_evaluation_dataset.py`](build_speed_evaluation_dataset_v2.py)
     --- the script used to construct the dataset.
 
 ## Domains
