@@ -163,54 +163,118 @@ def stop_token_ids(model, tokenizer) -> set:
 
 @torch.inference_mode()
 def measure_response_lengths(model, tokenizer, prompts, batch_size: int, max_new_tokens: int, desc: str = ""):
-    """
-    Greedy response length (tokens up to and including the first stop token, at most max_new_tokens) for every prompt,
-    generated in left-padded batches. Prompts are batched in order of token length, so a batch carries little padding;
-    a batch that runs out of GPU memory is split in half and retried. Returns [(prompt, prompt_len, response_len)] in the
-    order of `prompts`.
+    """Measure greedy response lengths, splitting OOM batches without recursive retries.
+
+    Prompts that still OOM when generated individually are skipped rather than
+    aborting the entire dataset build. Their response length is unknown, so they
+    are excluded from the returned list.
     """
     stop_ids = stop_token_ids(model, tokenizer)
-    pad_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else min(stop_ids)
-    encoded = [tokenizer.apply_chat_template([{"role": "user", "content": p}], add_generation_prompt=True,
-                                             enable_thinking=False, return_dict=True)["input_ids"] for p in prompts]
-    order = sorted(range(len(prompts)), key=lambda i: -len(encoded[i]))     # longest first: an OOM shows up early
-    response_len = [0] * len(prompts)
+    pad_id = tokenizer.pad_token_id
+    if pad_id is None:
+        pad_id = next(iter(stop_ids), tokenizer.eos_token_id)
+    if pad_id is None:
+        raise ValueError("Tokenizer must define a pad token or an EOS/stop token ID")
 
-    def run(idx):
-        L = max(len(encoded[i]) for i in idx)
-        input_ids = torch.full((len(idx), L), pad_id, dtype=torch.long)
-        attention_mask = torch.zeros((len(idx), L), dtype=torch.long)
-        for r, i in enumerate(idx):
-            ids = encoded[i]
-            input_ids[r, L - len(ids):] = torch.tensor(ids, dtype=torch.long)
-            attention_mask[r, L - len(ids):] = 1
+    encoded = [
+        tokenizer.apply_chat_template(
+            [{"role": "user", "content": p}],
+            add_generation_prompt=True,
+            enable_thinking=False,
+            return_dict=True,
+        )["input_ids"]
+        for p in prompts
+    ]
+    order = sorted(range(len(prompts)), key=lambda i: -len(encoded[i]))
+    response_len = [None] * len(prompts)
+
+    def try_generate(idx):
+        """Return generated token IDs on CPU, or None on CUDA OOM.
+
+        Keep this attempt in a separate stack frame. In particular, do not
+        recursively retry from inside an except block: the OOM traceback can
+        retain references to tensors from the failed generation while retries
+        are running, preventing those allocations from being released.
+        """
+        input_ids = attention_mask = out = None
         try:
-            out = model.generate(input_ids=input_ids.to(model.device), attention_mask=attention_mask.to(model.device),
-                                 do_sample=False, temperature=None, top_p=None, top_k=None,
-                                 max_new_tokens=max_new_tokens, pad_token_id=pad_id)
-        except (torch.cuda.OutOfMemoryError, torch.OutOfMemoryError):
-            if len(idx) == 1:
-                raise
-            torch.cuda.empty_cache()
-            half = len(idx) // 2
-            run(idx[:half])
-            run(idx[half:])
-            return
-        gen = out[:, L:].tolist()
-        for r, i in enumerate(idx):
-            n = next((k + 1 for k, t in enumerate(gen[r]) if t in stop_ids), len(gen[r]))
-            response_len[i] = min(n, max_new_tokens)
+            L = max(len(encoded[i]) for i in idx)
+            input_ids = torch.full((len(idx), L), pad_id, dtype=torch.long)
+            attention_mask = torch.zeros((len(idx), L), dtype=torch.long)
+            for r, i in enumerate(idx):
+                ids = encoded[i]
+                input_ids[r, L - len(ids):] = torch.tensor(ids, dtype=torch.long)
+                attention_mask[r, L - len(ids):] = 1
 
-    batches = [order[k:k + batch_size] for k in range(0, len(order), batch_size)]
-    for idx in tqdm.tqdm(batches, desc=desc):
-        run(idx)
-    return [(p, len(e), n) for p, e, n in zip(prompts, encoded, response_len)]
+            out = model.generate(
+                input_ids=input_ids.to(model.device),
+                attention_mask=attention_mask.to(model.device),
+                do_sample=False,
+                temperature=None,
+                top_p=None,
+                top_k=None,
+                max_new_tokens=max_new_tokens,
+                pad_token_id=pad_id,
+            )
+            # Copy generated tokens to CPU before releasing the GPU output.
+            return out[:, L:].cpu().tolist()
+        except torch.cuda.OutOfMemoryError:
+            return None
+        finally:
+            del out, input_ids, attention_mask
+
+    # Use an explicit work queue rather than recursive calls. Failed batch
+    # frames are gone before smaller batches are attempted.
+    pending = list(reversed([
+        order[k:k + batch_size] for k in range(0, len(order), batch_size)
+    ]))
+    pbar = tqdm.tqdm(total=len(prompts), desc=desc)
+    try:
+        while pending:
+            idx = pending.pop()
+            generated = try_generate(idx)
+            if generated is None:
+                # The failed attempt's frame/traceback has now unwound, so the
+                # allocator can release any newly-unused cached CUDA blocks.
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                if len(idx) > 1:
+                    mid = len(idx) // 2
+                    # Push second half first so the first half is processed next.
+                    pending.append(idx[mid:])
+                    pending.append(idx[:mid])
+                else:
+                    i = idx[0]
+                    print(
+                        f"WARNING: skipping prompt {i} in {desc!r}: CUDA OOM "
+                        f"even with batch_size=1 (prompt_tokens={len(encoded[i])})."
+                    )
+                    pbar.update(1)
+                continue
+
+            for r, i in enumerate(idx):
+                n = next(
+                    (k + 1 for k, token_id in enumerate(generated[r]) if token_id in stop_ids),
+                    len(generated[r]),
+                )
+                response_len[i] = min(n, max_new_tokens)
+                pbar.update(1)
+    finally:
+        pbar.close()
+
+    # OOM-skipped prompts have unknown lengths and must not be ranked as if
+    # they had zero-length responses.
+    return [
+        (prompt, len(ids), n)
+        for prompt, ids, n in zip(prompts, encoded, response_len)
+        if n is not None
+    ]
 
 
 if __name__ == "__main__":
     N_REPEATS = 100             # Number of prompts to keep per domain
     N_PREFETCH = 2 * N_REPEATS  # Number of prompts to sample from domain pool before ranking and selecting.
-    GEN_BATCH_SIZE = 64         # prompts per generate() call; an OOM batch is split automatically
+    GEN_BATCH_SIZE = 8          # prompts per generate() call; an OOM batch is split automatically. This setting is tuned for my RTX 3090 with 24 Gb of VRAM.
     MAX_NEW_TOKENS = 2048       # response-length probe; responses reaching it count as MAX_NEW_TOKENS
     MAX_PROMPT_TOKENS = MAX_NEW_TOKENS//2
 
