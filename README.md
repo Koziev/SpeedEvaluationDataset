@@ -94,9 +94,12 @@ A minimal loading example:
 
 ``` python
 import json
+from urllib.request import urlopen
 
-with open("speed_evaluation_dataset.json", encoding="utf-8") as f:
-    prompts_by_domain = json.load(f)
+url = "https://raw.githubusercontent.com/Koziev/SpeedEvaluationDataset/main/speed_evaluation_dataset.json"
+
+with urlopen(url) as response:
+    prompts_by_domain = json.load(response)
 
 for domain, prompts in prompts_by_domain.items():
     print(domain, len(prompts))
