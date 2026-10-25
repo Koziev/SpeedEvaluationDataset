@@ -188,7 +188,7 @@ def measure_response_lengths(model, tokenizer, prompts, batch_size: int, max_new
             out = model.generate(input_ids=input_ids.to(model.device), attention_mask=attention_mask.to(model.device),
                                  do_sample=False, temperature=None, top_p=None, top_k=None,
                                  max_new_tokens=max_new_tokens, pad_token_id=pad_id)
-        except torch.cuda.OutOfMemoryError:
+        except (torch.cuda.OutOfMemoryError, torch.OutOfMemoryError):
             if len(idx) == 1:
                 raise
             torch.cuda.empty_cache()
@@ -210,7 +210,7 @@ def measure_response_lengths(model, tokenizer, prompts, batch_size: int, max_new
 if __name__ == "__main__":
     N_REPEATS = 100             # Number of prompts to keep per domain
     N_PREFETCH = 2 * N_REPEATS  # Number of prompts to sample from domain pool before ranking and selecting.
-    GEN_BATCH_SIZE = 32         # prompts per generate() call; an OOM batch is split automatically
+    GEN_BATCH_SIZE = 64         # prompts per generate() call; an OOM batch is split automatically
     MAX_NEW_TOKENS = 2048       # response-length probe; responses reaching it count as MAX_NEW_TOKENS
     MAX_PROMPT_TOKENS = MAX_NEW_TOKENS//2
 
