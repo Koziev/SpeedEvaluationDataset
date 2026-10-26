@@ -17,13 +17,13 @@ The dataset measures generation performance, not task quality. It does not provi
 
 ## Files
 
--   [`speed_evaluation_dataset.json`](speed_evaluation_dataset.json) ---
+-   [`speed_evaluation_dataset.json`](speed_evaluation_dataset.json) —
     prompts grouped by domain.
--   [`speed_evaluation_dataset.md`](speed_evaluation_dataset.md) ---
+-   [`speed_evaluation_dataset.md`](speed_evaluation_dataset.md) —
     prompt and response length statistics for each domain, measured with
     the `Qwen/Qwen3-0.6B` tokenizer.
 -   [`build_speed_evaluation_dataset_v2.py`](build_speed_evaluation_dataset_v2.py)
-    --- the script used to construct the dataset.
+    — the script used to construct the dataset.
 
 ## Domains
 
@@ -55,27 +55,17 @@ The construction script collects candidate prompts from public datasets and priv
 
 ### English and Russian domains
 
--   [`jhu-clsp/jfleg`](https://huggingface.co/datasets/jhu-clsp/jfleg)
-    --- English grammatical error correction.
--   [`evilfreelancer/MATH-500-Russian`](https://huggingface.co/datasets/evilfreelancer/MATH-500-Russian)
-    --- Russian mathematics.
--   [`agentlans/allenai-WildChat-4.8M`](https://huggingface.co/datasets/agentlans/allenai-WildChat-4.8M)
-    --- English, Russian, and Chinese question-answering prompts.
--   [`MERA-evaluation/MERA`](https://huggingface.co/datasets/MERA-evaluation/MERA)
-    --- Russian-language tasks, including coding.
--   [`wmt/wmt19`](https://huggingface.co/datasets/wmt/wmt19) ---
-    Russian-to-English translation.
--   [`me-aas/python-code-dataset-500k`](https://huggingface.co/datasets/me-aas/python-code-dataset-500k)
-    --- coding instructions.
--   [`HaimingW/math_train_decontaminated`](https://huggingface.co/datasets/HaimingW/math_train_decontaminated)
-    --- mathematics.
--   [`checkai/instruction-poems`](https://huggingface.co/datasets/checkai/instruction-poems)
-    --- English poetry.
--   [`IsDeeCee/StoryMaker`](https://huggingface.co/datasets/IsDeeCee/StoryMaker)
-    --- creative writing.
--   [`smd20/social-engineering-qa-english`](https://huggingface.co/datasets/smd20/social-engineering-qa-english)
-    --- question answering.
--   **RUPOR** [arXiv:2505.04507](https://arxiv.org/abs/2505.04507) and **LoRuGEC** [link](https://aclanthology.org/2025.bea-1.38/) --- Russian grammar-correction resources.
+-   [`jhu-clsp/jfleg`](https://huggingface.co/datasets/jhu-clsp/jfleg) — English grammatical error correction.
+-   [`evilfreelancer/MATH-500-Russian`](https://huggingface.co/datasets/evilfreelancer/MATH-500-Russian) — Russian mathematics.
+-   [`agentlans/allenai-WildChat-4.8M`](https://huggingface.co/datasets/agentlans/allenai-WildChat-4.8M) — English, Russian, and Chinese question-answering prompts.
+-   [`MERA-evaluation/MERA`](https://huggingface.co/datasets/MERA-evaluation/MERA) — Russian-language tasks, including coding.
+-   [`wmt/wmt19`](https://huggingface.co/datasets/wmt/wmt19) — Russian-to-English translation.
+-   [`me-aas/python-code-dataset-500k`](https://huggingface.co/datasets/me-aas/python-code-dataset-500k) — coding instructions.
+-   [`HaimingW/math_train_decontaminated`](https://huggingface.co/datasets/HaimingW/math_train_decontaminated) — mathematics.
+-   [`checkai/instruction-poems`](https://huggingface.co/datasets/checkai/instruction-poems) — English poetry.
+-   [`IsDeeCee/StoryMaker`](https://huggingface.co/datasets/IsDeeCee/StoryMaker) — creative writing.
+-   [`smd20/social-engineering-qa-english`](https://huggingface.co/datasets/smd20/social-engineering-qa-english) — question answering.
+-   **RUPOR** [arXiv:2505.04507](https://arxiv.org/abs/2505.04507) and **LoRuGEC** [link](https://aclanthology.org/2025.bea-1.38/) — Russian grammar-correction resources.
 -   Private prompt collections for Russian poetry.
 
 Some Russian sources are local files and are not included in this repository.
@@ -160,20 +150,15 @@ tokenizers or generation configurations.
 
 ## Limitations
 
--   **Response-length selection bias:** prompts were selected for long
-    greedy responses from Qwen3-0.6B. The dataset is therefore not a
+-   **Response-length selection bias:** prompts were selected for long greedy responses from Qwen3-0.6B. The dataset is therefore not a
     random sample of typical user traffic.
--   **Model dependence:** prompts that elicit long responses from
-    Qwen3-0.6B may behave differently with other models.
--   **Capped length probes:** response-length measurements stop at 2,048
-    new tokens, so values at the cap are right-censored by the probe
+-   **Model dependence:** prompts that elicit long responses from Qwen3-0.6B may behave differently with other models.
+-   **Capped length probes:** response-length measurements stop at 2,048 new tokens, so values at the cap are right-censored by the probe
     limit.
--   **Source and licensing considerations:** prompts originate from
-    multiple datasets and private collections. Users are responsible for
+-   **Source and licensing considerations:** prompts originate from multiple datasets and private collections. Users are responsible for
     checking the applicable licenses, terms of use, and redistribution
     requirements for their intended use.
--   **Not a quality benchmark:** the dataset is intended for speed
-    evaluation; it does not by itself measure correctness, usefulness,
+-   **Not a quality benchmark:** the dataset is intended for speed evaluation; it does not by itself measure correctness, usefulness,
     or safety.
 
 ## Intended use
