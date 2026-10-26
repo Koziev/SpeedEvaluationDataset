@@ -12,18 +12,19 @@ The dataset measures generation performance, not task quality. It does not provi
 
 ## Files
 
--   [`speed_evaluation_dataset.json`](speed_evaluation_dataset.json) —
-    prompts grouped by domain.
--   [`speed_evaluation_dataset.md`](speed_evaluation_dataset.md) —
-    prompt and response length statistics for each domain, measured with
-    the `Qwen/Qwen3-0.6B` tokenizer.
--   [`build_speed_evaluation_dataset_v2.py`](build_speed_evaluation_dataset_v2.py)
-    — the script used to construct the first dataset.
--   [`speed_evaluation_dataset_part2.json`](speed_evaluation_dataset_part2.json) — conversation trajectories for agentic coding and tool calling.
--   [`speed_evaluation_dataset_part2.md`](speed_evaluation_dataset_part2.md) — per-sample and aggregate token-length statistics for the second dataset.
--   [`build_speed_evaluation_dataset_part2.py`](build_speed_evaluation_dataset_part2.py) — the script used to construct the second dataset and its Markdown statistics report.
--   [`smoke_test_speed_evaluation_dataset_part2.py`](smoke_test_speed_evaluation_dataset_part2.py) — a smoke test for running examples from the second dataset with Qwen models.
+### First dataset: Multilingual prompts
 
+- [`speed_evaluation_dataset.json`](speed_evaluation_dataset.json) — prompts grouped by domain.
+- [`speed_evaluation_dataset.md`](speed_evaluation_dataset.md) — prompt and response length statistics for each domain, measured with the `Qwen/Qwen3-0.6B` tokenizer.
+- [`build_speed_evaluation_dataset_v2.py`](build_speed_evaluation_dataset_v2.py) — script used to construct the first dataset.
+
+### Second dataset: Agentic coding and tool calling
+
+- [`speed_evaluation_dataset_part2.json`](speed_evaluation_dataset_part2.json) — conversation trajectories for agentic coding and tool calling.
+- [`speed_evaluation_dataset_part2.md`](speed_evaluation_dataset_part2.md) — per-sample and aggregate token-length statistics for the second dataset.
+- [`build_speed_evaluation_dataset_part2.py`](build_speed_evaluation_dataset_part2.py) — script used to construct the second dataset and generate its Markdown statistics report.
+- [`smoke_test_speed_evaluation_dataset_part2.py`](smoke_test_speed_evaluation_dataset_part2.py) — smoke test for running examples from the second dataset with Qwen models.
+ 
 ## Domains
 
 | Domain key | Task |
