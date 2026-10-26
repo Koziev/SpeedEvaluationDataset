@@ -11,8 +11,8 @@ import openpyxl
 from openpyxl.utils import range_boundaries
 import torch
 import transformers
-from transformers import AutoModelForCausalLM, AutoTokenizer
 import unicodedata
+import matplotlib.pyplot as plt
 
 
 def is_russian_text(text: str) -> bool:
@@ -271,6 +271,225 @@ def measure_response_lengths(model, tokenizer, prompts, batch_size: int, max_new
     ]
 
 
+# def plot_length_histograms(
+#     domain: str,
+#     data: dict,
+#     bins: int = 30,
+#     density: bool = False,
+#     histtype: str = "bar",   # "bar" | "step" | "stepfilled"
+#     figsize=(10, 6),
+# ):
+#     """
+#     Plot overlapping histograms of response lengths for different languages.
+#
+#     Parameters
+#     ----------
+#     domain : str
+#         Domain name
+#     data : dict[str, list[float]]
+#         Dictionary {language_code: [response_lengths]}.
+#     bins : int
+#         Number of bins (shared across all languages).
+#     density : bool
+#         Whether to normalize the histograms. Useful when languages have
+#         different sample sizes — in that case distributions are compared
+#         by shape rather than absolute counts.
+#     histtype : str
+#         Histogram type: 'bar' (default), 'step', 'stepfilled'.
+#     figsize : tuple
+#         Figure size.
+#     """
+#     # Drop empty lists, otherwise min/max will fail
+#     data = {lang: np.asarray(vals, dtype=float)
+#             for lang, vals in data.items() if len(vals) > 0}
+#     if not data:
+#         raise ValueError("No data to visualize")
+#
+#     # Shared bin edges — so that bars of all languages align on the X axis
+#     all_values = np.concatenate(list(data.values()))
+#     bin_edges = np.linspace(all_values.min(), all_values.max(), bins + 1)
+#
+#     fig, ax = plt.subplots(figsize=figsize)
+#
+#     # matplotlib will pick a different color for each call
+#     for lang, values in data.items():
+#         ax.hist(
+#             values,
+#             bins=bin_edges,
+#             alpha=0.5,                    # semi-transparent
+#             label=lang,
+#             density=density,
+#             histtype=histtype,
+#             edgecolor="black",
+#             linewidth=0.4,
+#         )
+#
+#     ax.set_xlabel("Response length, tokens")
+#     ax.set_ylabel("Density" if density else "Count")
+#     ax.set_title(f"Distribution of LLM response lengths in domain {domain} by language")
+#     ax.legend(title="Language")
+#     ax.grid(True, alpha=0.3)
+#     # ax.grid(visible=True, which='major', color='#444', linestyle='dashed', zorder=-1)
+#     # ax.grid(visible=True, which='minor', color='#ccc', linestyle='dotted', zorder=-1)
+#     plt.tight_layout()
+#     #plt.show()
+#
+#     return fig, ax
+
+
+# def plot_grouped_length_histograms(
+#     domain: str,
+#     data: dict,
+#     bins: int = 30,
+#     density: bool = False,
+#     figsize=(6, 4),
+#     alpha: float = 0.75,
+# ):
+#     """
+#     Grouped histograms of response lengths: shared bins, side-by-side bars.
+#
+#     Parameters
+#     ----------
+#     data : dict[str, list[float]]
+#         Dictionary {language_code: [response_lengths]}.
+#     bins : int
+#         Number of bins (shared across all languages).
+#     density : bool
+#         Normalize each language's histogram (useful for unequal sample sizes).
+#     figsize : tuple
+#         Figure size.
+#     alpha : float
+#         Bar opacity.
+#     """
+#     # Drop empty lists, otherwise min/max will fail
+#     data = {lang: np.asarray(vals, dtype=float)
+#             for lang, vals in data.items() if len(vals) > 0}
+#     if not data:
+#         raise ValueError("No data to visualize")
+#
+#     # (1) Shared bin edges — identical for every language
+#     all_values = np.concatenate(list(data.values()))
+#     bin_edges = np.linspace(all_values.min(), all_values.max(), bins + 1)
+#     bin_width = bin_edges[1] - bin_edges[0]
+#     lefts = bin_edges[:-1]                       # left edge of each bin
+#
+#     langs = list(data.keys())
+#     n_langs = len(langs)
+#
+#     # (2) Each bar occupies 1/n_langs of the bin width
+#     bar_width = bin_width / n_langs
+#
+#     fig, ax = plt.subplots(figsize=figsize)
+#
+#     for i, lang in enumerate(langs):
+#         # Force the same bins by passing bin_edges explicitly
+#         counts, _ = np.histogram(data[lang], bins=bin_edges, density=density)
+#
+#         # (3) Slide bar i to its slot within the bin
+#         positions = lefts + (i + 0.5) * bar_width
+#
+#         ax.bar(
+#             positions,
+#             counts,
+#             width=bar_width,
+#             alpha=alpha,
+#             label=lang,
+#             edgecolor="black",
+#             linewidth=0.4,
+#         )
+#
+#     ax.set_xlabel("Response length")
+#     ax.set_ylabel("Density" if density else "Count")
+#     ax.set_title(f"Distribution of LLM response lengths in domain {domain}")
+#     ax.legend(title="Language")
+#     ax.grid(True, alpha=0.3, axis="y")
+#     plt.tight_layout()
+#
+#     return fig, ax
+
+
+def plot_grouped_length_histograms(
+    domain: str,
+    data: dict,
+    bins: int = 30,
+    density: bool = False,
+    gap: float = 0.2,        # fraction of bin width left empty between bins
+    figsize=(10, 6),
+    alpha: float = 0.75,
+):
+    """
+    Grouped histograms of response lengths: shared bins, side-by-side bars,
+    with a visible gap between adjacent bins.
+
+    Parameters
+    ----------
+    domain : str
+        Domain name
+    data : dict[str, list[float]]
+        Dictionary {language_code: [response_lengths]}.
+    bins : int
+        Number of bins (shared across all languages).
+    density : bool
+        Normalize each language's histogram (useful for unequal sample sizes).
+    gap : float
+        Fraction of the bin width left empty between bins (0..1).
+        E.g. 0.2 means bars occupy 80% of the bin, 20% is a gap.
+    figsize : tuple
+        Figure size.
+    alpha : float
+        Bar opacity.
+    """
+    if not 0.0 <= gap < 1.0:
+        raise ValueError("gap must be in [0, 1)")
+
+    data = {lang: np.asarray(vals, dtype=float)
+            for lang, vals in data.items() if len(vals) > 0}
+    if not data:
+        raise ValueError("No data to visualize")
+
+    # Shared bin edges — identical for every language
+    all_values = np.concatenate(list(data.values()))
+    bin_edges = np.linspace(all_values.min(), all_values.max(), bins + 1)
+    bin_width = bin_edges[1] - bin_edges[0]
+    lefts = bin_edges[:-1]
+
+    langs = list(data.keys())
+    n_langs = len(langs)
+
+    # Width actually occupied by bars inside one bin (rest = gap)
+    group_width = bin_width * (1.0 - gap)
+    bar_width = group_width / n_langs
+
+    # Offset of the group's left edge from the bin's left edge
+    group_offset = (bin_width - group_width) / 2.0
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    for i, lang in enumerate(langs):
+        counts, _ = np.histogram(data[lang], bins=bin_edges, density=density)
+
+        # Bars sit side-by-side, starting at group_offset inside the bin
+        positions = lefts + group_offset + (i + 0.5) * bar_width
+
+        ax.bar(
+            positions,
+            counts,
+            width=bar_width,
+            alpha=alpha,
+            label=lang,
+            edgecolor="black",
+            linewidth=0.4,
+        )
+
+    ax.set_xlabel("Response length, tokens")
+    ax.set_ylabel("Density" if density else "Count")
+    ax.set_title(f"Distribution of LLM response lengths in domain {domain}")
+    ax.legend(title="Language")
+    ax.grid(True, alpha=0.3, axis="y")
+    plt.tight_layout()
+
+    return fig, ax
+
 if __name__ == "__main__":
     N_REPEATS = 100             # Number of prompts to keep per domain
     N_PREFETCH = 2 * N_REPEATS  # Number of prompts to sample from domain pool before ranking and selecting.
@@ -343,7 +562,7 @@ if __name__ == "__main__":
         prompts["math-ru"].append(sample["problem"])
 
     ds_name = "agentlans/allenai-WildChat-4.8M"
-    dataset = datasets.load_dataset(ds_name, "Russian", split="train", streaming=False)
+    dataset = datasets.load_dataset(ds_name, "Russian", split="train", streaming=False).shuffle(seed=shuffle_seed)
     for sample in tqdm.tqdm(dataset, desc=ds_name+" Russian"):
         messages = sample["conversations"]
         if len(messages) == 2 and messages[0]["from"] == "human" and messages[1]["from"] == "gpt":
@@ -354,7 +573,7 @@ if __name__ == "__main__":
                 if len(prompts["qa-ru"]) >= N_PREFETCH:
                     break
 
-    dataset = datasets.load_dataset(ds_name, "English", split="train", streaming=False)
+    dataset = datasets.load_dataset(ds_name, "English", split="train", streaming=False).shuffle(seed=shuffle_seed)
     for sample in tqdm.tqdm(dataset, desc=ds_name+" English"):
         messages = sample["conversations"]
         if len(messages) == 2 and messages[0]["from"] == "human" and messages[1]["from"] == "gpt":
@@ -368,7 +587,7 @@ if __name__ == "__main__":
     # Chinese general question answering.
     ds_name = "agentlans/allenai-WildChat-4.8M"
     print(f"Loading {ds_name} Chinese...")
-    dataset = datasets.load_dataset(ds_name, "Chinese", split="train", streaming=False)
+    dataset = datasets.load_dataset(ds_name, "Chinese", split="train", streaming=False).shuffle(seed=shuffle_seed)
     for sample in tqdm.tqdm(dataset, desc=ds_name + " Chinese"):
         messages = sample["conversations"]
         if len(messages) == 2 and messages[0]["from"] == "human" and messages[1]["from"] == "gpt":
@@ -388,7 +607,7 @@ if __name__ == "__main__":
     # use only Chinese splits and retain math questions.
     ds_name = "Shawn-wxh/livek12bench"
     print(f"Loading {ds_name} Chinese mathematics...")
-    livek12 = datasets.load_dataset(ds_name)
+    livek12 = datasets.load_dataset(ds_name).shuffle(seed=shuffle_seed)
     for split_name in ("zh_2603", "zh_2605"):
         if split_name not in livek12:
             continue
@@ -584,14 +803,23 @@ if __name__ == "__main__":
     # Let’s make a final selection of prompts that will elicit the longest
     # possible responses from the model (batched greedy generation).
     final_prompts = collections.defaultdict(list)
-    info_table = [["Domain", "No. prompts", "Mean prompt length, toks", "Mean response length, toks"]]
-    for domain, raw_prompts in prompts.items():
+
+    # Per-domain properties of prompts and corresponding responses
+    qa_prompts = collections.defaultdict(list)
+    math_prompts = collections.defaultdict(list)
+    code_prompts = collections.defaultdict(list)
+    poetry_prompts = collections.defaultdict(list)
+
+    info_table = [["Domain", "No. prompts", "Prompt length, toks<br>mean<sub>min, max</sub>", "Response length, toks<br>mean<sub>min, max</sub>"]]
+    for domain in sorted(prompts.keys()):
+        raw_prompts = prompts[domain]
         raw_prompts = list(dict.fromkeys(raw_prompts))  # avoid duplicates; keeps the order, so the selection is reproducible
-        print("\nDomain: {}  raw prompts: {}".format(domain, len(raw_prompts)))
+        print("\nStart processing domain {}\nRaw prompts: {}".format(domain, len(raw_prompts)))
 
         if len(raw_prompts) > N_PREFETCH:
-            raw_prompts = [prompt for prompt in tqdm.tqdm(raw_prompts, desc=domain) if check_prompt_length(prompt)]
+            raw_prompts = [prompt for prompt in raw_prompts if check_prompt_length(prompt)]
             raw_prompts = sorted(raw_prompts, key=lambda z: -len(z))[:N_PREFETCH]
+            print("No. raw prompts after truncation: {}".format(len(raw_prompts)))
 
         if not raw_prompts:
             print(f"WARNING: no candidate prompts collected for domain {domain}; skipping.")
@@ -602,8 +830,27 @@ if __name__ == "__main__":
 
         prompt_response_list = sorted(prompt_response_list, key=lambda z: -z[2])  # stable: ties keep the original order
         prompt_response_list = prompt_response_list[:N_REPEATS]
-        for prompt, _, _ in prompt_response_list:
+
+        if domain.endswith("-ru"):
+            language = "ru"
+        elif domain.endswith("-zh"):
+            language = "zh"
+        else:
+            language = "en"
+
+        for prompt, prompt_num_toks, response_num_toks in prompt_response_list:
             final_prompts[domain].append(prompt)
+            prompt_info = {"prompt": prompt,
+                           "prompt_num_toks": prompt_num_toks,
+                           "response_num_toks": response_num_toks}
+            if domain.startswith("math"):
+                math_prompts[language].append(prompt_info)
+            elif domain.startswith("qa"):
+                qa_prompts[language].append(prompt_info)
+            elif domain.startswith("code"):
+                code_prompts[language].append(prompt_info)
+            elif domain.startswith("poetry"):
+                poetry_prompts[language].append(prompt_info)
 
         prompt_lengths = [prompt_len for _, prompt_len, _ in prompt_response_list]
         response_lengths = [response_len for _, _, response_len in prompt_response_list]
@@ -612,13 +859,32 @@ if __name__ == "__main__":
             final_prompts.pop(domain, None)
             continue
 
-        print("Domain: {}  response lengths: min={} avg={} max={}".format(domain, min(response_lengths), np.mean(response_lengths), max(response_lengths)))
+        print("Domain: {}  population: {}  response lengths: min={} avg={} max={}".format(domain, len(final_prompts[domain]), min(response_lengths), np.mean(response_lengths), max(response_lengths)))
 
         info_table.append((domain,
                            len(final_prompts[domain]),
                            "{:.1f}<sub>{}, {}</sub>".format(np.mean(prompt_lengths), min(prompt_lengths), max(prompt_lengths)),
                            "{:.1f}<sub>{}, {}</sub>".format(np.mean(response_lengths), min(response_lengths), max(response_lengths))
                            ))
+
+        # After processing each domain, we output the selected prompts to a file for visual review.
+        with open("speed_evaluation_dataset.txt", "w") as f:
+            for domain, domain_prompts in final_prompts.items():
+                f.write(f"\n=== START OF DOMAIN: {domain} ===\n\n")
+                for i, prompt in enumerate(domain_prompts, start=1):
+                    f.write(f"--- domain: {domain}  prompt #{i} ---\n\n{prompt}\n\n")
+                f.write(f"\n=== END OF DOMAIN {domain} ===\n\n")
+
+        # Visualize prompt and response lengths for several domains
+        for domain, stat in [("code", code_prompts), ("qa", qa_prompts), ("math", math_prompts), ("poetry", poetry_prompts)]:
+            if stat:
+                language_to_prompt_lengths = dict()
+                for language, stat in stat.items():
+                    language_to_prompt_lengths[language] = [x["response_num_toks"] for x in stat]
+
+                plt.clf()
+                fig, zx = plot_grouped_length_histograms(domain, language_to_prompt_lengths, bins=10, density=True)
+                fig.savefig(f"response_length_in_domain_{domain}.png", dpi=150, bbox_inches="tight")
 
     # Generation speed evaluation dataset in JSON file.
     with open("speed_evaluation_dataset.json", "w") as f:
@@ -628,11 +894,3 @@ if __name__ == "__main__":
     with open("speed_evaluation_dataset.md", "w") as f:
         f.write("Tokenizer: `{}`\n\n".format(model_id))
         f.write(terminaltables.GithubFlavoredMarkdownTable(info_table).table)
-
-    # Output the lists of prompts for visual control.
-    with open("speed_evaluation_dataset.txt", "w") as f:
-        for domain, prompts in final_prompts.items():
-            f.write(f"\n=== START OF DOMAIN: {domain} ===\n\n")
-            for i, prompt in enumerate(prompts, start=1):
-                f.write(f"--- domain {domain} prompt #{i} ---\n\n{prompt}\n\n")
-            f.write(f"\n=== END OF DOMAIN {domain} ===\n\n")
