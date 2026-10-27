@@ -760,11 +760,6 @@ if __name__ == "__main__":
 
     info_table = [["Domain", "No. prompts", "Prompt length, toks<br>mean<sub>min, max</sub>", "Response length, toks<br>mean<sub>min, max</sub>"]]
     for idomain, domain in enumerate(sorted(prompts.keys()), start=1):
-        # НАЧАЛО ОТЛАДКИ
-        #if domain != "poetry-zh":
-        #    continue
-        # КОНЕЦ ОТЛАДКИ
-
         print("\n{}/{} Start processing domain \"{}\"".format(idomain, len(prompts), domain))
 
         raw_prompts = prompts[domain]
