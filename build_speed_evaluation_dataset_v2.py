@@ -13,6 +13,9 @@ import torch
 import transformers
 import unicodedata
 import matplotlib.pyplot as plt
+import gzip
+import json
+import requests
 
 
 def is_russian_text(text: str) -> bool:
@@ -63,6 +66,20 @@ def is_chinese_text(text: str) -> bool:
 
 def check_prompt_length(prompt: str) -> bool:
     if prompt is None or len(prompt) < 50 or len(prompt) > 4000:
+        return False
+
+    prompt_token_ids = tokenizer.apply_chat_template([{"role": "user", "content": prompt}],
+                                                    add_generation_prompt=True,
+                                                    enable_thinking=False,
+                                                    return_dict=True)["input_ids"]
+    if len(prompt_token_ids) > MAX_PROMPT_TOKENS:
+        return False
+
+    return True
+
+
+def check_chinese_prompt_length(prompt: str) -> bool:
+    if prompt is None or len(prompt) < 10 or len(prompt) > 4000:
         return False
 
     prompt_token_ids = tokenizer.apply_chat_template([{"role": "user", "content": prompt}],
@@ -159,6 +176,24 @@ def stop_token_ids(model, tokenizer) -> set:
             continue
         ids.update(x if isinstance(x, (list, tuple)) else [x])
     return {int(i) for i in ids if i is not None and i >= 0}
+
+
+def stream_jsonl_gz(url):
+    """Yield parsed JSON objects from a remote .jsonl.gz file without
+    downloading it completely."""
+    with requests.get(url, stream=True, timeout=30) as resp:
+        resp.raise_for_status()
+        # GzipFile reads the raw response stream and decompresses on the fly
+        with gzip.GzipFile(fileobj=resp.raw) as gz:
+            for line in gz:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    yield json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+
 
 
 @torch.inference_mode()
@@ -271,143 +306,6 @@ def measure_response_lengths(model, tokenizer, prompts, batch_size: int, max_new
     ]
 
 
-# def plot_length_histograms(
-#     domain: str,
-#     data: dict,
-#     bins: int = 30,
-#     density: bool = False,
-#     histtype: str = "bar",   # "bar" | "step" | "stepfilled"
-#     figsize=(10, 6),
-# ):
-#     """
-#     Plot overlapping histograms of response lengths for different languages.
-#
-#     Parameters
-#     ----------
-#     domain : str
-#         Domain name
-#     data : dict[str, list[float]]
-#         Dictionary {language_code: [response_lengths]}.
-#     bins : int
-#         Number of bins (shared across all languages).
-#     density : bool
-#         Whether to normalize the histograms. Useful when languages have
-#         different sample sizes — in that case distributions are compared
-#         by shape rather than absolute counts.
-#     histtype : str
-#         Histogram type: 'bar' (default), 'step', 'stepfilled'.
-#     figsize : tuple
-#         Figure size.
-#     """
-#     # Drop empty lists, otherwise min/max will fail
-#     data = {lang: np.asarray(vals, dtype=float)
-#             for lang, vals in data.items() if len(vals) > 0}
-#     if not data:
-#         raise ValueError("No data to visualize")
-#
-#     # Shared bin edges — so that bars of all languages align on the X axis
-#     all_values = np.concatenate(list(data.values()))
-#     bin_edges = np.linspace(all_values.min(), all_values.max(), bins + 1)
-#
-#     fig, ax = plt.subplots(figsize=figsize)
-#
-#     # matplotlib will pick a different color for each call
-#     for lang, values in data.items():
-#         ax.hist(
-#             values,
-#             bins=bin_edges,
-#             alpha=0.5,                    # semi-transparent
-#             label=lang,
-#             density=density,
-#             histtype=histtype,
-#             edgecolor="black",
-#             linewidth=0.4,
-#         )
-#
-#     ax.set_xlabel("Response length, tokens")
-#     ax.set_ylabel("Density" if density else "Count")
-#     ax.set_title(f"Distribution of LLM response lengths in domain {domain} by language")
-#     ax.legend(title="Language")
-#     ax.grid(True, alpha=0.3)
-#     # ax.grid(visible=True, which='major', color='#444', linestyle='dashed', zorder=-1)
-#     # ax.grid(visible=True, which='minor', color='#ccc', linestyle='dotted', zorder=-1)
-#     plt.tight_layout()
-#     #plt.show()
-#
-#     return fig, ax
-
-
-# def plot_grouped_length_histograms(
-#     domain: str,
-#     data: dict,
-#     bins: int = 30,
-#     density: bool = False,
-#     figsize=(6, 4),
-#     alpha: float = 0.75,
-# ):
-#     """
-#     Grouped histograms of response lengths: shared bins, side-by-side bars.
-#
-#     Parameters
-#     ----------
-#     data : dict[str, list[float]]
-#         Dictionary {language_code: [response_lengths]}.
-#     bins : int
-#         Number of bins (shared across all languages).
-#     density : bool
-#         Normalize each language's histogram (useful for unequal sample sizes).
-#     figsize : tuple
-#         Figure size.
-#     alpha : float
-#         Bar opacity.
-#     """
-#     # Drop empty lists, otherwise min/max will fail
-#     data = {lang: np.asarray(vals, dtype=float)
-#             for lang, vals in data.items() if len(vals) > 0}
-#     if not data:
-#         raise ValueError("No data to visualize")
-#
-#     # (1) Shared bin edges — identical for every language
-#     all_values = np.concatenate(list(data.values()))
-#     bin_edges = np.linspace(all_values.min(), all_values.max(), bins + 1)
-#     bin_width = bin_edges[1] - bin_edges[0]
-#     lefts = bin_edges[:-1]                       # left edge of each bin
-#
-#     langs = list(data.keys())
-#     n_langs = len(langs)
-#
-#     # (2) Each bar occupies 1/n_langs of the bin width
-#     bar_width = bin_width / n_langs
-#
-#     fig, ax = plt.subplots(figsize=figsize)
-#
-#     for i, lang in enumerate(langs):
-#         # Force the same bins by passing bin_edges explicitly
-#         counts, _ = np.histogram(data[lang], bins=bin_edges, density=density)
-#
-#         # (3) Slide bar i to its slot within the bin
-#         positions = lefts + (i + 0.5) * bar_width
-#
-#         ax.bar(
-#             positions,
-#             counts,
-#             width=bar_width,
-#             alpha=alpha,
-#             label=lang,
-#             edgecolor="black",
-#             linewidth=0.4,
-#         )
-#
-#     ax.set_xlabel("Response length")
-#     ax.set_ylabel("Density" if density else "Count")
-#     ax.set_title(f"Distribution of LLM response lengths in domain {domain}")
-#     ax.legend(title="Language")
-#     ax.grid(True, alpha=0.3, axis="y")
-#     plt.tight_layout()
-#
-#     return fig, ax
-
-
 def plot_grouped_length_histograms(
     domain: str,
     data: dict,
@@ -490,10 +388,11 @@ def plot_grouped_length_histograms(
 
     return fig, ax
 
+
 if __name__ == "__main__":
     N_REPEATS = 100             # Number of prompts to keep per domain
-    N_PREFETCH = 2 * N_REPEATS  # Number of prompts to sample from domain pool before ranking and selecting.
-    GEN_BATCH_SIZE = 8          # prompts per generate() call; an OOM batch is split automatically. This setting is tuned for my RTX 3090 with 24 Gb of VRAM.
+    N_PREFETCH = 10 * N_REPEATS  # Number of prompts to sample from domain pool before ranking and selecting.
+    GEN_BATCH_SIZE = 32         # prompts per generate() call; an OOM batch is split automatically. This setting is tuned for my RTX 3090 with 24 Gb of VRAM.
     MAX_NEW_TOKENS = 2048       # response-length probe; responses reaching it count as MAX_NEW_TOKENS
     MAX_PROMPT_TOKENS = MAX_NEW_TOKENS//2
 
@@ -502,16 +401,24 @@ if __name__ == "__main__":
     shuffle_seed = 31415926
 
     model_id = "Qwen/Qwen3-0.6B"
-    print(f"Loading {model_id}...")
-    model = transformers.AutoModelForCausalLM.from_pretrained(
-        model_id,
-        dtype=torch.bfloat16, device_map="cuda",
-        attn_implementation="flash_attention_2",  # options: sdpa | eager | flash_attention_2 | flash_attention_4
-        trust_remote_code=True,
-    ).eval()
-    tokenizer = transformers.AutoTokenizer.from_pretrained(model_id, padding_side="left")
 
     # ---------------------------------------------------------------------------
+
+    tokenizer = transformers.AutoTokenizer.from_pretrained(model_id, padding_side="left")
+
+
+    # Russian-English pairs
+    print("Load pairs from Koziev/Translations...")
+    URL = (
+        "https://github.com/Koziev/Translations/raw/refs/heads/main/"
+        "prose_translation_pairs.public.jsonl.gz"
+    )
+    for record in stream_jsonl_gz(URL):
+        ru_text = record.get("right_text")
+        if is_russian_text(ru_text) and len(ru_text) > 500:
+            prompt = "Translate the text into English: {}".format(ru_text)
+            if check_prompt_length(prompt):
+                prompts["wmt ru-en"].append(prompt)
 
     ds_name = "/home/inkoziev/polygon/text_generator/tmp/sft_v053/sft23_dataset.unstressed.v053.eval.jsonl"
     print(f"Loading {ds_name}...")
@@ -535,6 +442,9 @@ if __name__ == "__main__":
             if sample.get("corrupted_text") and sample.get("fixed_text") and sample["domain"] == "prose":
                 gec_src_list.add(sample["corrupted_text"])
 
+                if len(sample.get("fixed_text")) > 200:
+                    prompts["wmt ru-en"].append("Translate the text into English: {}".format(sample.get("fixed_text")))
+
     print("Importing LoRuGEC...")
     lorugec = build_lorugec()
     for sample in lorugec:
@@ -555,6 +465,50 @@ if __name__ == "__main__":
         prompt = "Correct grammar, punctuation, and spelling errors in the text: {}".format(src)
         prompts["gec-en"].append(prompt)
 
+
+    # Chinese poetry-generation instructions. Filter a broad Chinese instruction
+    # corpus for prompts specifically about composing poetry or classical verse.
+    poetry_terms = ("写一首诗", "写首诗", "创作一首诗", "创作诗歌", "写一首古诗",
+                    "作一首诗", "写诗", "诗歌创作", "填词", "写一首词", "对联",
+                    "写一首歌", "写一首十四行诗", "诗")
+
+    ds_name = "Iess/chinese_modern_poetry"
+    print(f"Loading {ds_name} poetry candidates...")
+    dataset = datasets.load_dataset(ds_name, split="train")
+    for sample in tqdm.tqdm(dataset.shuffle(seed=shuffle_seed), desc=ds_name + " poetry"):
+        q = str(sample.get("prompt", "")).strip()
+        a = str(sample.get("response", "")).strip()
+        if (
+            q
+            and a
+            and is_chinese_text(q)
+            and is_chinese_text(a)
+            and any(term in q for term in poetry_terms)
+            and check_chinese_prompt_length(q)
+        ):
+            prompts["poetry-zh"].append(q)
+            if len(prompts["poetry-zh"]) >= N_PREFETCH:
+                break
+
+    if len(prompts["poetry-zh"]) < N_PREFETCH:
+        ds_name = "lcccher/Chinese-Instruct"
+        print(f"Loading {ds_name} poetry candidates...")
+        dataset = datasets.load_dataset(ds_name, "firefly", split="train")
+        for sample in tqdm.tqdm(dataset.shuffle(seed=shuffle_seed), desc=ds_name + " poetry"):
+            q = str(sample.get("prompt", "")).strip()
+            a = str(sample.get("response", "")).strip()
+            if (
+                q
+                and a
+                and is_chinese_text(q)
+                and is_chinese_text(a)
+                and any(term in q for term in poetry_terms)
+                and check_chinese_prompt_length(q)
+            ):
+                prompts["poetry-zh"].append(q)
+                if len(prompts["poetry-zh"]) >= N_PREFETCH:
+                    break
+
     ds_name = "evilfreelancer/MATH-500-Russian"
     print(f"Loading {ds_name}...")
     ds = datasets.load_dataset(ds_name, split="test")
@@ -568,7 +522,7 @@ if __name__ == "__main__":
         if len(messages) == 2 and messages[0]["from"] == "human" and messages[1]["from"] == "gpt":
             q = messages[0]["value"].strip()
             a = messages[1]["value"].strip()
-            if 200 < len(q) and 200 < len(a) and is_russian_text(q) and is_russian_text(a):
+            if check_prompt_length(q) and 200 < len(a) and is_russian_text(q) and is_russian_text(a):
                 prompts["qa-ru"].append(q)
                 if len(prompts["qa-ru"]) >= N_PREFETCH:
                     break
@@ -579,7 +533,7 @@ if __name__ == "__main__":
         if len(messages) == 2 and messages[0]["from"] == "human" and messages[1]["from"] == "gpt":
             q = messages[0]["value"].strip()
             a = messages[1]["value"].strip()
-            if 200 < len(q) and 200 < len(a):
+            if check_prompt_length(q) and 200 < len(a):
                 prompts["qa"].append(q)
                 if len(prompts["qa"]) >= N_PREFETCH:
                     break
@@ -598,6 +552,7 @@ if __name__ == "__main__":
                 and 200 < len(a)
                 and is_chinese_text(q)
                 and is_chinese_text(a)
+                and check_chinese_prompt_length(q)
             ):
                 prompts["qa-zh"].append(q)
                 if len(prompts["qa-zh"]) >= N_PREFETCH:
@@ -619,11 +574,10 @@ if __name__ == "__main__":
                 prompt = "请详细解答下面的数学问题，给出清晰的推导步骤和最终答案：\\n\\n" + question
                 if check_prompt_length(prompt):
                     prompts["math-zh"].append(prompt)
-                if len(prompts["math-zh"]) >= N_PREFETCH:
-                    break
+                    if len(prompts["math-zh"]) >= N_PREFETCH:
+                        break
         if len(prompts["math-zh"]) >= N_PREFETCH:
             break
-
 
 
     # Supplement Chinese mathematics with native Chinese word problems
@@ -691,28 +645,6 @@ if __name__ == "__main__":
             if len(prompts["code-zh"]) >= N_PREFETCH:
                 break
 
-    # Chinese poetry-generation instructions. Filter a broad Chinese instruction
-    # corpus for prompts specifically about composing poetry or classical verse.
-    ds_name = "lcccher/Chinese-Instruct"
-    print(f"Loading {ds_name} poetry candidates...")
-    dataset = datasets.load_dataset(ds_name, "firefly", split="train")
-    poetry_terms = ("写一首诗", "写首诗", "创作一首诗", "创作诗歌", "写一首古诗",
-                    "作一首诗", "写诗", "诗歌创作", "填词", "写一首词", "对联")
-    for sample in tqdm.tqdm(dataset.shuffle(seed=shuffle_seed), desc=ds_name + " poetry"):
-        q = str(sample.get("prompt", "")).strip()
-        a = str(sample.get("response", "")).strip()
-        if (
-            q
-            and a
-            and is_chinese_text(q)
-            and is_chinese_text(a)
-            and any(term in q for term in poetry_terms)
-            and check_prompt_length(q)
-        ):
-            prompts["poetry-zh"].append(q)
-            if len(prompts["poetry-zh"]) >= N_PREFETCH:
-                break
-
     # MERA-evaluation/MERA
     ds_name = "MERA-evaluation/MERA"
     print(f"Loading {ds_name}...")
@@ -757,6 +689,14 @@ if __name__ == "__main__":
             except Exception as ex:
                 print(traceback.format_exc())
 
+    if len(prompts["code-ru"]) < N_PREFETCH:
+        with open("coding_data/ru_coding_instruct_dataset.jsonl") as f:
+            for line in f:
+                sample = json.loads(line)
+                prompt = sample["query"]
+                if check_prompt_length(prompt) and is_russian_text(prompt[:100]):
+                    prompts["code-ru"].append(prompt)
+
     ds_name = "wmt/wmt19"
     print(f"Loading {ds_name}...")
     dataset = datasets.load_dataset(ds_name, "ru-en", split="validation")
@@ -790,7 +730,7 @@ if __name__ == "__main__":
     ds_name = "IsDeeCee/StoryMaker"
     print(f"Loading {ds_name}...")
     ds = datasets.load_dataset(ds_name, split="train")
-    for sample in ds.shuffle(seed=shuffle_seed).take(N_PREFETCH):
+    for sample in ds.shuffle(seed=shuffle_seed):
         prompts["creative-en"].append(sample["Prompt"])
 
     ds_name = "smd20/social-engineering-qa-english"
@@ -810,20 +750,39 @@ if __name__ == "__main__":
     code_prompts = collections.defaultdict(list)
     poetry_prompts = collections.defaultdict(list)
 
+    print(f"Loading {model_id}...")
+    model = transformers.AutoModelForCausalLM.from_pretrained(
+        model_id,
+        dtype=torch.bfloat16, device_map="cuda",
+        attn_implementation="flash_attention_2",  # options: sdpa | eager | flash_attention_2 | flash_attention_4
+        trust_remote_code=True,
+    ).eval()
+
     info_table = [["Domain", "No. prompts", "Prompt length, toks<br>mean<sub>min, max</sub>", "Response length, toks<br>mean<sub>min, max</sub>"]]
-    for domain in sorted(prompts.keys()):
+    for idomain, domain in enumerate(sorted(prompts.keys()), start=1):
+        # НАЧАЛО ОТЛАДКИ
+        #if domain != "poetry-zh":
+        #    continue
+        # КОНЕЦ ОТЛАДКИ
+
+        print("\n{}/{} Start processing domain \"{}\"".format(idomain, len(prompts), domain))
+
         raw_prompts = prompts[domain]
         raw_prompts = list(dict.fromkeys(raw_prompts))  # avoid duplicates; keeps the order, so the selection is reproducible
-        print("\nStart processing domain {}\nRaw prompts: {}".format(domain, len(raw_prompts)))
-
-        if len(raw_prompts) > N_PREFETCH:
+        if domain.endswith("-zh"):
+            raw_prompts = [prompt for prompt in raw_prompts if check_chinese_prompt_length(prompt)]
+        else:
             raw_prompts = [prompt for prompt in raw_prompts if check_prompt_length(prompt)]
-            raw_prompts = sorted(raw_prompts, key=lambda z: -len(z))[:N_PREFETCH]
-            print("No. raw prompts after truncation: {}".format(len(raw_prompts)))
+        raw_prompts = sorted(raw_prompts, key=lambda z: -len(z))
+        print("Raw prompts: {}".format(len(raw_prompts)))
 
         if not raw_prompts:
             print(f"WARNING: no candidate prompts collected for domain {domain}; skipping.")
             continue
+
+        if len(raw_prompts) > N_REPEATS*4:
+            raw_prompts = raw_prompts[:N_REPEATS*4]
+            print("No. raw prompts after truncation: {}".format(len(raw_prompts)))
 
         prompt_response_list = measure_response_lengths(model, tokenizer, raw_prompts, GEN_BATCH_SIZE, MAX_NEW_TOKENS,
                                                         desc=domain)
@@ -883,8 +842,10 @@ if __name__ == "__main__":
                     language_to_prompt_lengths[language] = [x["response_num_toks"] for x in stat]
 
                 plt.clf()
-                fig, zx = plot_grouped_length_histograms(domain, language_to_prompt_lengths, bins=10, density=True)
+                fig, zx = plot_grouped_length_histograms(domain, language_to_prompt_lengths, bins=5, density=True)
                 fig.savefig(f"response_length_in_domain_{domain}.png", dpi=150, bbox_inches="tight")
+
+        plt.close()
 
     # Generation speed evaluation dataset in JSON file.
     with open("speed_evaluation_dataset.json", "w") as f:
