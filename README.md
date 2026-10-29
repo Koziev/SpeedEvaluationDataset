@@ -72,9 +72,9 @@ For the Chinese domains, I use these sources and selection rules:
 | Domain | Source | Selection approach |
 |---|---|---|
 | `qa-zh` | [`agentlans/allenai-WildChat-4.8M`](https://huggingface.co/datasets/agentlans/allenai-WildChat-4.8M), `Chinese` configuration | I select user prompts from two-message human/assistant conversations when both the query and response exceed 200 characters and pass the Chinese-text filter. |
-| `math-zh` | [`Shawn-wxh/livek12bench`](https://huggingface.co/datasets/Shawn-wxh/livek12bench) | I select Chinese records from the `zh_2603` and `zh_2605` splits whose subject is mathematics, then wrap each question in an instruction asking for a detailed solution. |
+| `math-zh` | [`Shawn-wxh/livek12bench`](https://huggingface.co/datasets/Shawn-wxh/livek12bench) | I select Chinese records from the `zh_2603` and `zh_2605` splits whose subject is mathematics, then wrap each question in an instruction asking for a detailed solution. I randomly paraphrase this instruction prefix to introduce additional prompt variation. |
 | `code-zh` | [`Mxode/Chinese-Instruct-Lite`](https://huggingface.co/datasets/Mxode/Chinese-Instruct-Lite), `code` configuration | I sample Chinese coding instructions with non-empty prompt and response fields. |
-| `poetry-zh` | [`lcccher/Chinese-Instruct`](https://huggingface.co/datasets/lcccher/Chinese-Instruct), `firefly` configuration | I filter Chinese instructions for poetry-related terms, including requests for poems, classical verse, lyrics, and couplets. |
+| `poetry-zh` | [`lcccher/Chinese-Instruct`](https://huggingface.co/datasets/lcccher/Chinese-Instruct), `firefly` configuration | I filter Chinese instructions for poetry-related terms, including requests for poems, classical verse, lyrics, and couplets. I randomly paraphrase the poetry instruction prefix to introduce additional prompt variation. |
 
 My Chinese-text filter checks whether Han characters account for more than half of the relevant characters after whitespace and punctuation are excluded. This is a practical heuristic in the construction script, not a comprehensive language-identification system.
 
